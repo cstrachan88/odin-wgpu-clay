@@ -1,0 +1,14 @@
+{
+    "$schema": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/odinfmt.schema.json",
+    "brace_style": "Stroustrup",
+    "character_width": 122,
+    "convert_do": false,
+    "exp_multiline_composite_literals": false,
+    "indent_cases": true,
+    "inline_single_stmt_case": true,
+    "newline_limit": 4,
+    "newline_style": "LF",
+    "spaces": 2,
+    "tabs": false,
+    "tabs_width": 2
+}

@@ -1,0 +1,32 @@
+version: "3"
+
+tasks:
+  windows:
+    cmds:
+      - task: build-windows-release
+
+  ensure-windows-dir-exists:
+    internal: true
+    dir: build/windows
+
+  build-windows-debug:
+    internal: true
+    deps:
+      - ensure-windows-dir-exists
+    cmd: odin build src -target:windows_amd64 -out:build/windows/wgpu_debug.exe -subsystem:windows -debug -show-timings
+    sources:
+      - src/*
+      - shaders/*
+    generates:
+      - build/windows/wgpu_debug.exe
+
+  build-windows-release:
+    internal: true
+    deps:
+      - ensure-windows-dir-exists
+    cmd: odin build src -target:windows_amd64 -out:build/windows/wgpu.exe -subsystem:windows -o:aggressive -no-bounds-check -disable-assert -vet-packages:wgpu -vet -vet-cast -vet-semicolon -vet-style -show-timings -show-system-calls
+    sources:
+      - src/*
+      - shaders/*
+    generates:
+      - build/windows/wgpu.exe

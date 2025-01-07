@@ -1,0 +1,55 @@
+version: "3"
+
+# NOTE: changing this requires changing the same values in the `web/index.html`.
+vars:
+  INITIAL_MEMORY_PAGES: 2000
+  MAX_MEMORY_PAGES: 65536
+  PAGE_SIZE: 65536
+  INITIAL_MEMORY_BYTES:
+    sh: echo '$(({{.INITIAL_MEMORY_PAGES}} * {{.PAGE_SIZE}}))'
+  MAX_MEMORY_BYTES:
+    sh: echo '$(({{.MAX_MEMORY_PAGES}} * {{.PAGE_SIZE}}))'
+
+tasks:
+  web:
+    cmds:
+      # - task: copy-odin-js
+      - task: copy-web
+      - task: build-web
+
+  clean-web:
+    platforms: [windows]
+    cmd: 'powershell "rm build/web -r -fo -ea ig ; exit 0"'
+
+  build-web:
+    internal: true
+    cmd: odin build src -target:js_wasm32 -out:build/web/wgpu.wasm -o:size -extra-linker-flags:"--export-table --import-memory --initial-memory={{.INITIAL_MEMORY_BYTES}} --max-memory={{.MAX_MEMORY_BYTES}}"
+    sources:
+      - src/*
+      - shaders/*
+    generates:
+      - build/web/wgpu.wasm
+
+  copy-web:
+    internal: true
+    platforms: [windows]
+    cmd: 'powershell "xcopy web build\web" /I /Y'
+    sources:
+      - web/*
+    generates:
+      - build/web/index.html
+      - build/web/wgpu.js
+      - build/web/odin.js
+
+  copy-odin-js:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - 'powershell "xcopy $(odin root)vendor\wgpu\wgpu.js web\wgpu.js" /-I /Y'
+      - 'powershell "xcopy $(odin root)core\sys\wasm\js\odin.js web\odin.js" /-I /Y'
+    sources:
+      - $(odin root)/vendor/wgpu/wgpu.js
+      - $(odin root)/core/sys/wasm/js/odin.js
+    generates:
+      - web/wgpu.js
+      - web/odin.js

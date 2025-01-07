@@ -1,0 +1,40 @@
+version: "3"
+
+includes:
+  web:
+    taskfile: ./Taskfile_web.yml
+    flatten: true
+    optional: true
+
+  windows:
+    taskfile: ./Taskfile_windows.yml
+    flatten: true
+    optional: true
+
+tasks:
+  build-debug:
+    cmds:
+      - task: build-windows-debug
+
+  build-release:
+    cmds:
+      - task: windows
+
+  clean:
+    platforms: [windows]
+    cmd: 'powershell "rm build -r -fo -ea ig ; exit 0"'
+
+  test:
+    deps:
+      - ensure-windows-dir-exists
+    cmd: odin test src -target:windows_amd64 -out:build/windows/wgpu_test.exe -debug
+
+  run-debug:
+    cmds:
+      - task: build-debug
+      - raddbg --auto_run -q ./build/windows/wgpu_debug.exe
+
+  run:
+    cmds:
+      - task: build-release
+      - ./build/windows/wgpu.exe
