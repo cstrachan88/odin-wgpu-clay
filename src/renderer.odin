@@ -19,6 +19,12 @@ Ui_Rect :: struct #align (16) {
   font_offset:    [2]f32,
 }
 
+Scissor :: struct {
+  start:  u32,
+  end:    u32, // exclusive
+  bounds: [4]u32,
+}
+
 Document :: struct {
   title:    string,
   contents: string,
@@ -363,7 +369,7 @@ r_render :: proc() {
       ),
     },
   )
-  num_ui_rects := clay_render(&render_commands, ui_render_pass)
+  num_ui_rects, scissors := clay_render(&render_commands, ui_render_pass)
   if num_ui_rects > 0 {
     wgpu.RenderPassEncoderSetPipeline(ui_render_pass, r.ui_pipeline)
     wgpu.RenderPassEncoderSetBindGroup(ui_render_pass, 0, r.ui_bind_group)
@@ -376,7 +382,8 @@ r_render :: proc() {
       0,
       u64(num_ui_rects) * size_of(Ui_Rect),
     )
-    wgpu.RenderPassEncoderDrawIndexed(ui_render_pass, 6, num_ui_rects, 0, 0, 0)
+    // wgpu.RenderPassEncoderDrawIndexed(ui_render_pass, 6, num_ui_rects, 0, 0, 0)
+    draw_ui_rects_and_handle_scissors(ui_render_pass, num_ui_rects, scissors)
   }
   wgpu.RenderPassEncoderEnd(ui_render_pass)
   wgpu.RenderPassEncoderRelease(ui_render_pass)
@@ -480,10 +487,17 @@ render_header_button :: proc(text: string) {
   }
 }
 
-clay_render :: proc(render_commands: ^clay.ClayArray(clay.RenderCommand), render_pass: wgpu.RenderPassEncoder) -> u32 {
+clay_render :: proc(
+  render_commands: ^clay.ClayArray(clay.RenderCommand),
+  render_pass: wgpu.RenderPassEncoder,
+) -> (
+  u32,
+  []Scissor,
+) {
   r := &state.renderer
 
   rects := make([dynamic]Ui_Rect, context.temp_allocator)
+  scissors := make([dynamic]Scissor, context.temp_allocator)
 
   for i in 0 ..< render_commands.length {
     render_command := clay.RenderCommandArray_Get(render_commands, i)
@@ -491,6 +505,7 @@ clay_render :: proc(render_commands: ^clay.ClayArray(clay.RenderCommand), render
 
     switch render_command.commandType {
       case clay.RenderCommandType.None:
+
       case clay.RenderCommandType.Text:
         // TODO: use storage buffer?
 
@@ -526,41 +541,18 @@ clay_render :: proc(render_commands: ^clay.ClayArray(clay.RenderCommand), render
         }
 
       case clay.RenderCommandType.Image: // TODO
+
       case clay.RenderCommandType.ScissorStart:
-        // NOTE https://stackoverflow.com/questions/73769626/setting-scissor-rectangle-before-clearing
-        // https://www.gamedev.net/forums/topic/660120-gui-scissor/5175171/
+        // NOTE: Can their be nested scissors???
+        append(
+          &scissors,
+          Scissor {
+            start = u32(len(rects) - 1),
+            bounds = {u32(bounding_box.x), u32(bounding_box.y), u32(bounding_box.width), u32(bounding_box.height)},
+          },
+        )
 
-        // FIXME
-        // fmt.println("In scissor start")
-        // fmt.println("In scissor start -", render_command^)
-        // fmt.println(render_command.config.borderElementConfig)
-        // fmt.println(render_command.config.customElementConfig)
-        // fmt.println(render_command.config.imageElementConfig)
-        // fmt.println(render_command.config.rectangleElementConfig)
-        // fmt.println(render_command.config.textElementConfig)
-        // NOTE: If this scissor is from the contents of the scroll container, should the padding be taken into account??
-
-        // wgpu.RenderPassEncoderSetScissorRect(
-        //   render_pass,
-        //   u32(bounding_box.x),
-        //   u32(bounding_box.y),
-        //   u32(bounding_box.width),
-        //   u32(bounding_box.height),
-        // )
-        // wgpu.RenderPassEncoderSetScissorRect(
-        //   render_pass,
-        //   u32(bounding_box.x + 16),
-        //   u32(bounding_box.y + 16),
-        //   u32(bounding_box.width - 32),
-        //   u32(bounding_box.height - 32),
-        // )
-        {}
-
-      case clay.RenderCommandType.ScissorEnd:
-        // FIXME
-        // fmt.println("In scissor end")
-        // wgpu.RenderPassEncoderSetScissorRect(render_pass, 0, 0, r.config.width, r.config.height)
-        {}
+      case clay.RenderCommandType.ScissorEnd: scissors[len(scissors) - 1].end = u32(len(rects))
 
       case clay.RenderCommandType.Rectangle:
         config := render_command.config.rectangleElementConfig
@@ -584,13 +576,57 @@ clay_render :: proc(render_commands: ^clay.ClayArray(clay.RenderCommand), render
         )
 
       case clay.RenderCommandType.Border: // TODO
+
       case clay.RenderCommandType.Custom:
     }
   }
 
-  wgpu.QueueWriteBuffer(r.queue, r.ui_instance_buffer, 0, raw_data(rects), len(rects) * size_of(Ui_Rect))
+  num_rects: uint = len(rects)
+  wgpu.QueueWriteBuffer(r.queue, r.ui_instance_buffer, 0, raw_data(rects), num_rects * size_of(Ui_Rect))
 
-  return u32(len(rects))
+  return u32(num_rects), scissors[:]
+}
+
+draw_ui_rects_and_handle_scissors :: proc(render_pass: wgpu.RenderPassEncoder, num_rects: u32, scissors: []Scissor) {
+  r := &state.renderer
+
+  // NOTE: these are indexes of instances
+  current_index: u32 = 0
+  first_instance: u32 = 0
+  rect_count: u32 = 0
+  last_scissor_end: u32 = 0
+
+  for scissor, i in scissors {
+    // Handle rects before current scissor
+    if current_index < scissor.start {
+      wgpu.RenderPassEncoderSetScissorRect(render_pass, 0, 0, r.config.width, r.config.height)
+      wgpu.RenderPassEncoderDrawIndexed(render_pass, 6, 1 + scissor.start - current_index, 0, 0, current_index)
+
+      last_scissor_end = scissor.start
+      current_index = scissor.start
+    }
+
+    // Handle rects in current scissor range
+    rect_count = scissor.end - current_index
+    first_instance = current_index
+
+    wgpu.RenderPassEncoderSetScissorRect(
+      render_pass,
+      scissor.bounds.x,
+      scissor.bounds.y,
+      scissor.bounds.z,
+      scissor.bounds.w,
+    )
+    wgpu.RenderPassEncoderDrawIndexed(render_pass, 6, rect_count, 0, 0, first_instance)
+
+    current_index = scissor.end
+  }
+
+  // Handle remaining rects
+  if current_index < num_rects {
+    wgpu.RenderPassEncoderSetScissorRect(render_pass, 0, 0, r.config.width, r.config.height)
+    wgpu.RenderPassEncoderDrawIndexed(render_pass, 6, num_rects - current_index, 0, 0, current_index)
+  }
 }
 
 selected_document_idx: u32 = 0
