@@ -4,11 +4,13 @@ import "base:runtime"
 import clay "shared:clay/bindings/odin/clay-odin"
 
 state := struct {
-  ctx:      runtime.Context,
-  bg:       [4]u8,
-  os:       OS,
-  renderer: Renderer,
-  // cursor:          [2]i32,
+  ctx:          runtime.Context,
+  bg:           [4]u8,
+  os:           OS,
+  renderer:     Renderer,
+  cursor_pos:   [2]f32,
+  pointer_down: bool,
+  scroll_delta: [2]f32,
 } {
   bg = {90, 95, 100, 255},
 }
@@ -34,18 +36,12 @@ main :: proc() {
 frame :: proc(dt: f32) {
   free_all(context.temp_allocator)
 
-  // TODO:
-  // clay.SetPointerState(transmute(clay.Vector2)raylib.GetMousePosition(), raylib.IsMouseButtonDown(raylib.MouseButton.LEFT))
-  // clay.UpdateScrollContainers(false, transmute(clay.Vector2)raylib.GetMouseWheelMoveV(), raylib.GetFrameTime())
-  // clay.SetLayoutDimensions({cast(f32)raylib.GetScreenWidth(), cast(f32)raylib.GetScreenHeight()})
-  // renderCommands: clay.ClayArray(clay.RenderCommand) = createLayout(animationLerpValue < 0 ? (animationLerpValue + 1) : (1 - animationLerpValue))
-  // clayRaylibRender(&renderCommands)
+  // Update UI
+  clay.SetPointerState(state.cursor_pos, state.pointer_down)
+  clay.UpdateScrollContainers(false, state.scroll_delta, dt)
+  clay.SetLayoutDimensions({f32(state.renderer.config.width), f32(state.renderer.config.height)})
 
   r_render()
-}
-
-measure_text :: proc "c" (text: ^clay.String, config: ^clay.TextElementConfig) -> clay.Dimensions {
-  return {}
 }
 
 ui_error_handler :: proc "c" (errorData: clay.ErrorData) {

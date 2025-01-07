@@ -24,10 +24,10 @@ os_init :: proc() {
   state.os.window = glfw.CreateWindow(800, 600, "ODIN / GLFW / MICROUI / WGPU", nil, nil)
   assert(state.os.window != nil)
 
-  // glfw.SetKeyCallback(state.os.window, key_callback)
-  // glfw.SetMouseButtonCallback(state.os.window, mouse_button_callback)
-  // glfw.SetCursorPosCallback(state.os.window, cursor_pos_callback)
-  // glfw.SetScrollCallback(state.os.window, scroll_callback)
+  glfw.SetKeyCallback(state.os.window, key_callback)
+  glfw.SetMouseButtonCallback(state.os.window, mouse_button_callback)
+  glfw.SetCursorPosCallback(state.os.window, cursor_pos_callback)
+  glfw.SetScrollCallback(state.os.window, scroll_callback)
   // glfw.SetCharCallback(state.os.window, char_callback)
   glfw.SetFramebufferSizeCallback(state.os.window, size_callback)
 }
@@ -83,64 +83,68 @@ os_get_clipboard :: proc(_: rawptr) -> (string, bool) {
   return clipboard, true
 }
 
-// @(private="file")
-// key_callback :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: i32) {
-// 	context = state.ctx
+@(private = "file")
+key_callback :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: i32) {
+  context = state.ctx
 
-// 	mu_key: mu.Key; switch key {
-// 	case glfw.KEY_LEFT_SHIFT, glfw.KEY_RIGHT_SHIFT:     mu_key = .ALT
-// 	case glfw.KEY_LEFT_CONTROL, glfw.KEY_RIGHT_CONTROL,
-// 	     glfw.KEY_LEFT_SUPER, glfw.KEY_RIGHT_SUPER:     mu_key = .CTRL
-// 	case glfw.KEY_LEFT_ALT, glfw.KEY_RIGHT_ALT:         mu_key = .ALT
-// 	case glfw.KEY_BACKSPACE:                            mu_key = .BACKSPACE
-// 	case glfw.KEY_DELETE:                               mu_key = .DELETE
-// 	case glfw.KEY_ENTER:                                mu_key = .RETURN
-// 	case glfw.KEY_LEFT:                                 mu_key = .LEFT
-// 	case glfw.KEY_RIGHT:                                mu_key = .RIGHT
-// 	case glfw.KEY_HOME:                                 mu_key = .HOME
-// 	case glfw.KEY_END:                                  mu_key = .END
-// 	case glfw.KEY_A:                                    mu_key = .A
-// 	case glfw.KEY_X:                                    mu_key = .X
-// 	case glfw.KEY_C:                                    mu_key = .C
-// 	case glfw.KEY_V:                                    mu_key = .V
-// 	case:                                               return
-// 	}
+  switch key {
+    // case glfw.KEY_LEFT_SHIFT, glfw.KEY_RIGHT_SHIFT:     mu_key = .ALT
+    // case glfw.KEY_LEFT_CONTROL, glfw.KEY_RIGHT_CONTROL,
+    //      glfw.KEY_LEFT_SUPER, glfw.KEY_RIGHT_SUPER:     mu_key = .CTRL
+    // case glfw.KEY_LEFT_ALT, glfw.KEY_RIGHT_ALT:         mu_key = .ALT
+    // case glfw.KEY_BACKSPACE:                            mu_key = .BACKSPACE
+    // case glfw.KEY_DELETE:                               mu_key = .DELETE
+    // case glfw.KEY_ENTER:                                mu_key = .RETURN
+    // case glfw.KEY_LEFT:                                 mu_key = .LEFT
+    // case glfw.KEY_RIGHT:                                mu_key = .RIGHT
+    // case glfw.KEY_HOME:                                 mu_key = .HOME
+    // case glfw.KEY_END:                                  mu_key = .END
+    // case glfw.KEY_A:                                    mu_key = .A
+    // case glfw.KEY_X:                                    mu_key = .X
+    // case glfw.KEY_C:                                    mu_key = .C
+    case glfw.KEY_ESCAPE:
+      glfw.SetWindowShouldClose(window, true)
+    case:
+      return
+  }
 
-// 	switch action {
-// 	case glfw.PRESS, glfw.REPEAT: mu.input_key_down(&state.mu_ctx, mu_key)
-// 	case glfw.RELEASE:            mu.input_key_up  (&state.mu_ctx, mu_key)
-// 	case:                         return
-// 	}
-// }
+  // switch action {
+  // case glfw.PRESS, glfw.REPEAT: mu.input_key_down(&state.mu_ctx, mu_key)
+  // case glfw.RELEASE:            mu.input_key_up  (&state.mu_ctx, mu_key)
+  // case:                         return
+  // }
+}
 
-// @(private="file")
-// mouse_button_callback :: proc "c" (window: glfw.WindowHandle, key, action, mods: i32) {
-// 	context = state.ctx
+@(private = "file")
+mouse_button_callback :: proc "c" (window: glfw.WindowHandle, key, action, mods: i32) {
+  context = state.ctx
 
-// 	mu_key: mu.Mouse; switch key {
-// 	case glfw.MOUSE_BUTTON_MIDDLE: mu_key = .MIDDLE
-// 	case glfw.MOUSE_BUTTON_LEFT:   mu_key = .LEFT
-// 	case glfw.MOUSE_BUTTON_RIGHT:  mu_key = .RIGHT
-// 	}
+  left_click := false
 
-// 	switch action {
-// 	case glfw.PRESS, glfw.REPEAT: mu.input_mouse_down(&state.mu_ctx, state.cursor.x, state.cursor.y, mu_key)
-// 	case glfw.RELEASE:            mu.input_mouse_up  (&state.mu_ctx, state.cursor.x, state.cursor.y, mu_key)
-// 	}
-// }
+  switch key {
+    case glfw.MOUSE_BUTTON_LEFT: left_click = true
+  }
 
-// @(private="file")
-// cursor_pos_callback :: proc "c" (window: glfw.WindowHandle, x, y: f64) {
-// 	context = state.ctx
-//   state.cursor = {i32(f32(x) / os_get_dpi()), i32(f32(y) / os_get_dpi())}
-// 	mu.input_mouse_move(&state.mu_ctx, state.cursor.x, state.cursor.y)
-// }
+  if left_click {
+    switch action {
+      case glfw.PRESS: state.pointer_down = true
+      case glfw.RELEASE: state.pointer_down = false
+    }
+  }
+}
 
-// @(private="file")
-// scroll_callback :: proc "c" (window: glfw.WindowHandle, x, y: f64) {
-// 	context = state.ctx
-// 	mu.input_scroll(&state.mu_ctx, -i32(math.round(x)), -i32(math.round(y)))
-// }
+@(private = "file")
+cursor_pos_callback :: proc "c" (window: glfw.WindowHandle, x, y: f64) {
+  context = state.ctx
+  dpi := os_get_dpi()
+  state.cursor_pos = {f32(x) / dpi, f32(y) / dpi}
+}
+
+@(private = "file")
+scroll_callback :: proc "c" (window: glfw.WindowHandle, x, y: f64) {
+  context = state.ctx
+  state.scroll_delta = {f32(x), f32(y)}
+}
 
 // @(private="file")
 // char_callback :: proc "c" (window: glfw.WindowHandle, ch: rune) {
