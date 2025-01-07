@@ -1,23 +1,26 @@
 package wgpu_app
 
-import intr "base:intrinsics"
 import "core:fmt"
-import "core:math/linalg"
+import clay "shared:clay/bindings/odin/clay-odin"
 import "vendor:wgpu"
 
+MAX_UI_RECTS :: 100
+
 Renderer :: struct {
-  instance:          wgpu.Instance,
-  surface:           wgpu.Surface,
-  adapter:           wgpu.Adapter,
-  device:            wgpu.Device,
-  config:            wgpu.SurfaceConfiguration,
-  queue:             wgpu.Queue,
+  instance:           wgpu.Instance,
+  surface:            wgpu.Surface,
+  adapter:            wgpu.Adapter,
+  device:             wgpu.Device,
+  config:             wgpu.SurfaceConfiguration,
+  queue:              wgpu.Queue,
   //
-  resolution_buffer: wgpu.Buffer,
+  resolution_buffer:  wgpu.Buffer,
   //
-  // ui_module:         wgpu.ShaderModule,
-  ui_pipeline:       wgpu.RenderPipeline,
-  ui_bind_group:     wgpu.BindGroup,
+  ui_pipeline:        wgpu.RenderPipeline,
+  ui_bind_group:      wgpu.BindGroup,
+  ui_vertex_buffer:   wgpu.Buffer,
+  ui_index_buffer:    wgpu.Buffer,
+  ui_instance_buffer: wgpu.Buffer,
 }
 
 r_init_and_run :: proc() {
@@ -82,6 +85,22 @@ on_adapter_and_device :: proc() {
     &wgpu.BufferDescriptor{label = "Screen Resolution Buffer", usage = {.Uniform, .CopyDst}, size = 8},
   )
 
+  // Setup ui vertex buffers
+  r.ui_vertex_buffer = wgpu.DeviceCreateBufferWithDataSlice(
+    r.device,
+    &{label = "UI Vertex Buffer", usage = {.Vertex}},
+    []f32{1, 1, -1, 1, -1, -1, 1, -1},
+  )
+  r.ui_index_buffer = wgpu.DeviceCreateBufferWithDataSlice(
+    r.device,
+    &{label = "UI Index Buffer", usage = {.Index, .Vertex}},
+    []u16{0, 1, 2, 0, 2, 3},
+  )
+  r.ui_instance_buffer = wgpu.DeviceCreateBuffer(
+    r.device,
+    &{label = "UI Instance buffer", usage = {.Vertex, .CopyDst}, size = MAX_UI_RECTS * size_of(Ui_Rect)},
+  )
+
   // Set up ui pipeline
   ui_module := wgpu.DeviceCreateShaderModule(
     r.device,
@@ -135,7 +154,33 @@ on_adapter_and_device :: proc() {
     &wgpu.RenderPipelineDescriptor {
       label = "UI Render Pipeline",
       layout = ui_pipeline_layout,
-      vertex = wgpu.VertexState{module = ui_module, entryPoint = "vs_main"},
+      vertex = wgpu.VertexState {
+        module = ui_module,
+        entryPoint = "vs_main",
+        bufferCount = 2,
+        buffers = raw_data(
+          []wgpu.VertexBufferLayout {
+            {
+              arrayStride = 8,
+              stepMode = .Vertex,
+              attributeCount = 1,
+              attributes = &wgpu.VertexAttribute{shaderLocation = 0, offset = 0, format = .Float32x2},
+            },
+            {
+              arrayStride = size_of(Ui_Rect),
+              stepMode = .Instance,
+              attributeCount = 3,
+              attributes = raw_data(
+                []wgpu.VertexAttribute {
+                  {shaderLocation = 1, offset = u64(offset_of(Ui_Rect, pos)), format = .Float32x2},
+                  {shaderLocation = 2, offset = u64(offset_of(Ui_Rect, size)), format = .Float32x2},
+                  {shaderLocation = 3, offset = u64(offset_of(Ui_Rect, color)), format = .Float32x4},
+                },
+              ),
+            },
+          },
+        ),
+      },
       fragment = &wgpu.FragmentState {
         module = ui_module,
         entryPoint = "fs_main",
@@ -166,6 +211,8 @@ r_resize :: proc() {
   r.config.width, r.config.height = width, height
   wgpu.SurfaceConfigure(r.surface, &r.config)
 
+  clay.SetLayoutDimensions({f32(width), f32(height)})
+
   r_write_consts()
 }
 
@@ -194,28 +241,44 @@ r_render :: proc() {
   curr_view := wgpu.TextureCreateView(curr_texture.texture, nil)
   curr_encoder := wgpu.DeviceCreateCommandEncoder(r.device, nil)
 
-  ui_render_pass := wgpu.CommandEncoderBeginRenderPass(
-    curr_encoder,
-    &{
-      colorAttachmentCount = 1,
-      colorAttachments = raw_data(
-        []wgpu.RenderPassColorAttachment {
-          {
-            view = curr_view,
-            loadOp = .Clear,
-            storeOp = .Store,
-            clearValue = {f64(state.bg.r) / 255, f64(state.bg.g) / 255, f64(state.bg.b) / 255, f64(state.bg.a) / 255},
-            depthSlice = wgpu.DEPTH_SLICE_UNDEFINED,
+  // Update and write ui
+  render_commands := clay_create()
+  num_ui_rects := clay_render(&render_commands)
+
+  // Render ui
+  if num_ui_rects > 0 {
+    ui_render_pass := wgpu.CommandEncoderBeginRenderPass(
+      curr_encoder,
+      &{
+        colorAttachmentCount = 1,
+        colorAttachments     = raw_data(
+          []wgpu.RenderPassColorAttachment {
+            {
+              view       = curr_view,
+              loadOp     = .Clear,
+              storeOp    = .Store,
+              // clearValue = {f64(state.bg.r) / 255, f64(state.bg.g) / 255, f64(state.bg.b) / 255, f64(state.bg.a) / 255},
+              depthSlice = wgpu.DEPTH_SLICE_UNDEFINED,
+            },
           },
-        },
-      ),
-    },
-  )
-  wgpu.RenderPassEncoderSetPipeline(ui_render_pass, r.ui_pipeline)
-  wgpu.RenderPassEncoderSetBindGroup(ui_render_pass, 0, r.ui_bind_group)
-  wgpu.RenderPassEncoderDraw(ui_render_pass, 6, 1, 0, 0)
-  wgpu.RenderPassEncoderEnd(ui_render_pass)
-  wgpu.RenderPassEncoderRelease(ui_render_pass)
+        ),
+      },
+    )
+    wgpu.RenderPassEncoderSetPipeline(ui_render_pass, r.ui_pipeline)
+    wgpu.RenderPassEncoderSetBindGroup(ui_render_pass, 0, r.ui_bind_group)
+    wgpu.RenderPassEncoderSetIndexBuffer(ui_render_pass, r.ui_index_buffer, .Uint16, 0, 12)
+    wgpu.RenderPassEncoderSetVertexBuffer(ui_render_pass, 0, r.ui_vertex_buffer, 0, 32)
+    wgpu.RenderPassEncoderSetVertexBuffer(
+      ui_render_pass,
+      1,
+      r.ui_instance_buffer,
+      0,
+      u64(num_ui_rects) * size_of(Ui_Rect),
+    )
+    wgpu.RenderPassEncoderDrawIndexed(ui_render_pass, 6, num_ui_rects, 0, 0, 0)
+    wgpu.RenderPassEncoderEnd(ui_render_pass)
+    wgpu.RenderPassEncoderRelease(ui_render_pass)
+  }
 
   command_buffer := wgpu.CommandEncoderFinish(curr_encoder, nil)
   wgpu.QueueSubmit(r.queue, {command_buffer})
@@ -227,4 +290,57 @@ r_render :: proc() {
 
   wgpu.TextureViewRelease(curr_view)
   wgpu.TextureRelease(curr_texture.texture)
+}
+
+clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
+  clay.BeginLayout()
+
+  if clay.UI(
+    clay.Layout({layoutDirection = .TOP_TO_BOTTOM, sizing = {clay.SizingGrow({}), clay.SizingGrow({})}}),
+    clay.Rectangle({color = {1, 0, 0, 1}}),
+  ) {
+  }
+
+  return clay.EndLayout()
+}
+
+clay_render :: proc(render_commands: ^clay.ClayArray(clay.RenderCommand)) -> u32 {
+  rects := make([dynamic]Ui_Rect, context.temp_allocator)
+
+  for i in 0 ..< render_commands.length {
+    render_command := clay.RenderCommandArray_Get(render_commands, i)
+    bounding_box := render_command.boundingBox
+
+    switch (render_command.commandType) {
+      case clay.RenderCommandType.None:
+      case clay.RenderCommandType.Text:
+      case clay.RenderCommandType.Image:
+      case clay.RenderCommandType.ScissorStart:
+      case clay.RenderCommandType.ScissorEnd:
+      case clay.RenderCommandType.Rectangle:
+        // config := render_command.config.rectangleElementConfig
+        fmt.println(render_command)
+        fmt.printfln("%p", render_command.config.rectangleElementConfig)
+        fmt.println(render_command.config.rectangleElementConfig) // BUG: "Uncaught RuntimeError: memory access out of bounds" in js_wasm32 build
+
+        append(
+          &rects,
+          // Ui_Rect{{bounding_box.x, bounding_box.y}, {bounding_box.width, bounding_box.height}, config.color},
+          Ui_Rect{{bounding_box.x, bounding_box.y}, {bounding_box.width, bounding_box.height}, {1, 0, 0, 1}},
+        )
+      case clay.RenderCommandType.Border:
+      case clay.RenderCommandType.Custom:
+    }
+  }
+
+  r := &state.renderer
+  wgpu.QueueWriteBuffer(r.queue, r.ui_instance_buffer, 0, raw_data(rects), len(rects) * size_of(Ui_Rect))
+
+  return u32(len(rects))
+}
+
+Ui_Rect :: struct #align (16) {
+  pos:   [2]f32,
+  size:  [2]f32,
+  color: [4]f32,
 }

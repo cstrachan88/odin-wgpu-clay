@@ -1,41 +1,29 @@
-@group(0) @binding(0) var<uniform> screen_resolution: vec2u;
+@group(0) @binding(0) var<uniform> screen_resolution: vec2u; // pixel space
 
 struct Vertex_Input {
-    @builtin(vertex_index) vert_index: u32
+    @location(0) vertex_pos: vec2f, // [-1, 1]
+    @location(1) pos: vec2f, // pixel space
+    @location(2) size: vec2f, // pixel space
+    @location(3) color: vec4f,
 }
 
 struct Vertex_Output {
     @builtin(position) position: vec4f,
-    @location(0) tex_coord: vec2f,
+    @location(0) color: vec4f,
 }
 
 @vertex
 fn vs_main(in: Vertex_Input) -> Vertex_Output {
-    var positions = array<vec2f, 6>(
-        vec2f(1.0, 1.0),
-        vec2f(1.0, -1.0),
-        vec2f(-1.0, -1.0),
-        vec2f(1.0, 1.0),
-        vec2f(-1.0, -1.0),
-        vec2f(-1.0, 1.0),
-    );
-    
-    var tex_coords = array<vec2f, 6>(
-        vec2f(1.0, 0.0),
-        vec2f(1.0, 1.0),
-        vec2f(0.0, 1.0),
-        vec2f(1.0, 0.0),
-        vec2f(0.0, 1.0),
-        vec2f(0.0, 0.0),
-    );
+    let pixel_space_pos = in.pos + ((in.vertex_pos * 0.5 + 0.5) * in.size);
+    let ndc_pos = (pixel_space_pos / vec2f(screen_resolution)) * 2.0 - vec2f(1.0, 1.0);
 
     var out: Vertex_Output;
-    out.position = vec4f(positions[in.vert_index] * 0.5, 0.0, 1.0);
-    out.tex_coord = tex_coords[in.vert_index];
+    out.position = vec4f(ndc_pos.x, -ndc_pos.y, 0.0, 1.0);
+    out.color = in.color;
     return out;
 }
 
 @fragment
 fn fs_main(in: Vertex_Output) -> @location(0) vec4f {
-    return vec4f(in.tex_coord, 0.0, 1.0);
+    return in.color;
 }

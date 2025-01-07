@@ -34,10 +34,12 @@ main :: proc() {
 frame :: proc(dt: f32) {
   free_all(context.temp_allocator)
 
-  // mc := &state.mu_ctx
-  // mu.begin(mc)
-  // demo_windows(mc)
-  // mu.end(mc)
+  // TODO:
+  // clay.SetPointerState(transmute(clay.Vector2)raylib.GetMousePosition(), raylib.IsMouseButtonDown(raylib.MouseButton.LEFT))
+  // clay.UpdateScrollContainers(false, transmute(clay.Vector2)raylib.GetMouseWheelMoveV(), raylib.GetFrameTime())
+  // clay.SetLayoutDimensions({cast(f32)raylib.GetScreenWidth(), cast(f32)raylib.GetScreenHeight()})
+  // renderCommands: clay.ClayArray(clay.RenderCommand) = createLayout(animationLerpValue < 0 ? (animationLerpValue + 1) : (1 - animationLerpValue))
+  // clayRaylibRender(&renderCommands)
 
   r_render()
 }
