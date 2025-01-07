@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build Debug",
+            "name": "Debug",
+            "program": "${workspaceFolder}/build/windows/wgpu_debug.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                // { "name": "RUST_BACKTRACE", "value": "1" },
+                // { "name": "RUST_BACKTRACE", "value": "full" },
+            ],
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build Release",
+            "name": "Release",
+            "program": "${workspaceFolder}/build/windows/wgpu.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}

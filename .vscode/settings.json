@@ -1,0 +1,23 @@
+{
+    "[odin]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.formatOnSave": true,
+    },
+    "[wgsl]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.formatOnSave": true,
+    },
+    "[html]": {
+        "editor.insertSpaces": false,
+        "editor.tabSize": 4,
+        "editor.formatOnSave": true,
+    },
+    "yaml.schemas": {
+        "https://taskfile.dev/schema.json": [
+            "Taskfile.yml",
+            "Taskfile_*.yml",
+        ]
+    },
+}
