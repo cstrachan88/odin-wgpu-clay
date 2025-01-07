@@ -1,0 +1,6 @@
+*.odin linguist-detectable=true
+*.wgsl linguist-detectable=true
+*.html linguist-detectable=false
+*.js linguist-detectable=false
+*.json linguist-detectable=false
+*.yml linguist-detectable=false
