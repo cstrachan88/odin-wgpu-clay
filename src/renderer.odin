@@ -2,13 +2,15 @@ package wgpu_app
 
 import "core:fmt"
 import "core:image/png"
-import clay "shared:clay/bindings/odin/clay-odin"
 import "vendor:wgpu"
+
+// import clay "shared:clay/bindings/odin/clay-odin"
+import clay "../../clay/bindings/odin/clay-odin"
 
 COLOR_WHITE :: clay.Color{255, 255, 255, 255}
 
 // TODO: Use storage buffer probably
-MAX_UI_RECTS :: 10000
+MAX_UI_RECTS :: 100000
 
 Ui_Rect :: struct #align (16) {
   pos:            [2]f32,
@@ -430,7 +432,32 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
         },
       ),
     ) {
-      render_header_button("File")
+
+      if clay.UI(
+        clay.ID("FileButton"),
+        clay.Layout({padding = {16, 8}}),
+        clay.Rectangle({color = {140, 140, 140, 255}, cornerRadius = {5, 5, 5, 5}}),
+      ) {
+        clay.Text("File", clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
+
+        file_menu_visible :=
+          clay.PointerOver(clay.GetElementId(clay.MakeString("FileButton"))) ||
+          clay.PointerOver(clay.GetElementId(clay.MakeString("FileMenu")))
+
+        if file_menu_visible {
+          if clay.UI(
+            clay.ID("FileMenu"),
+            clay.Floating({attachment = {parent = .LEFT_BOTTOM}}),
+            clay.Rectangle({color = {40, 40, 40, 255}, cornerRadius = {8, 8, 8, 8}}),
+            clay.Layout({layoutDirection = .TOP_TO_BOTTOM, sizing = {width = clay.SizingFixed(200)}}),
+          ) {
+            render_dropdown_item("New")
+            render_dropdown_item("Open")
+            render_dropdown_item("Close")
+          }
+        }
+      }
+
       render_header_button("Edit")
       if clay.UI(clay.Layout({sizing = {width = clay.SizingGrow({})}})) {}
       render_header_button("Upload")
@@ -450,10 +477,26 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
           },
         ),
       ) {
-        for d in documents {
-          if clay.UI(
-            clay.Layout({padding = {}}),
-          ) {clay.Text(d.title, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))}
+        for d, i in documents {
+          if u32(i) == selected_document_idx {
+            if clay.UI(
+              clay.Layout({padding = {16, 16}, sizing = clay.Sizing{width = clay.SizingGrow({})}}),
+              clay.Rectangle({color = {120, 120, 120, 255}, cornerRadius = {8, 8, 8, 8}}),
+            ) {
+              clay.Text(d.title, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
+            }
+          }
+           else {
+            if clay.UI(
+              clay.Layout({padding = {16, 16}, sizing = clay.Sizing{width = clay.SizingGrow({})}}),
+              // BUG: Hovered is triggering when the parent container is hovered
+              clay.Rectangle({color = clay.Hovered() ? {120, 120, 120, 120} : {}, cornerRadius = {8, 8, 8, 8}}),
+            ) {
+              // NOTE: OnHover must be handled inside element - doesn't return a TypedConfig
+              clay.OnHover(handle_hover, nil)
+              clay.Text(d.title, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
+            }
+          }
         }
       }
       if clay.UI(
@@ -478,11 +521,25 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
   return clay.EndLayout()
 }
 
+handle_hover :: proc "c" (elementId: clay.ElementId, pointerInfo: clay.PointerData, userData: rawptr) {
+  context = state.ctx
+  // NOTE: Using offset here since it is sequential from 0 and matched the document index
+  if pointerInfo.state == .PRESSED_THIS_FRAME {
+    selected_document_idx = elementId.offset
+  }
+}
+
 render_header_button :: proc(text: string) {
   if clay.UI(
     clay.Layout({padding = {16, 8}}),
     clay.Rectangle({color = {140, 140, 140, 255}, cornerRadius = {5, 5, 5, 5}}),
   ) {
+    clay.Text(text, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
+  }
+}
+
+render_dropdown_item :: proc(text: string) {
+  if clay.UI(clay.Layout({padding = {16, 8}})) {
     clay.Text(text, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
   }
 }
@@ -596,7 +653,7 @@ draw_ui_rects_and_handle_scissors :: proc(render_pass: wgpu.RenderPassEncoder, n
   rect_count: u32 = 0
   last_scissor_end: u32 = 0
 
-  for scissor, i in scissors {
+  for scissor in scissors {
     // Handle rects before current scissor
     if current_index < scissor.start {
       wgpu.RenderPassEncoderSetScissorRect(render_pass, 0, 0, r.config.width, r.config.height)

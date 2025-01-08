@@ -1,6 +1,7 @@
 package wgpu_app
 
-import clay "shared:clay/bindings/odin/clay-odin"
+// import clay "shared:clay/bindings/odin/clay-odin"
+import clay "../../clay/bindings/odin/clay-odin"
 
 Font :: struct {
   using info:   struct {

@@ -21,7 +21,7 @@ os_init :: proc() {
 
   glfw.WindowHint(glfw.SCALE_TO_MONITOR, true)
   glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
-  state.os.window = glfw.CreateWindow(800, 600, "ODIN / GLFW / MICROUI / WGPU", nil, nil)
+  state.os.window = glfw.CreateWindow(800, 600, "ODIN / GLFW / WGPU / Clay", nil, nil)
   assert(state.os.window != nil)
 
   glfw.SetKeyCallback(state.os.window, key_callback)
@@ -87,6 +87,8 @@ os_get_clipboard :: proc(_: rawptr) -> (string, bool) {
 key_callback :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods: i32) {
   context = state.ctx
 
+  toggle_debug := false
+
   switch key {
     // case glfw.KEY_LEFT_SHIFT, glfw.KEY_RIGHT_SHIFT:     mu_key = .ALT
     // case glfw.KEY_LEFT_CONTROL, glfw.KEY_RIGHT_CONTROL,
@@ -102,10 +104,17 @@ key_callback :: proc "c" (window: glfw.WindowHandle, key, scancode, action, mods
     // case glfw.KEY_A:                                    mu_key = .A
     // case glfw.KEY_X:                                    mu_key = .X
     // case glfw.KEY_C:                                    mu_key = .C
+    case glfw.KEY_D: toggle_debug = true
+
     case glfw.KEY_ESCAPE:
       glfw.SetWindowShouldClose(window, true)
     case:
       return
+  }
+
+  if toggle_debug && action == glfw.PRESS {
+    if is_debug_visible() do set_debug_display(false)
+    else do set_debug_display(true)
   }
 
   // switch action {
@@ -136,8 +145,9 @@ mouse_button_callback :: proc "c" (window: glfw.WindowHandle, key, action, mods:
 @(private = "file")
 cursor_pos_callback :: proc "c" (window: glfw.WindowHandle, x, y: f64) {
   context = state.ctx
-  dpi := os_get_dpi()
-  state.cursor_pos = {f32(x) / dpi, f32(y) / dpi}
+  // dpi := os_get_dpi()
+  // state.cursor_pos = {f32(x) / dpi, f32(y) / dpi}
+  state.cursor_pos = {f32(x), f32(y)}
 }
 
 @(private = "file")
