@@ -38,6 +38,8 @@ os_run :: proc() {
     do_frame()
   }
 
+  finalize()
+
   glfw.DestroyWindow(state.os.window)
   glfw.Terminate()
 }
