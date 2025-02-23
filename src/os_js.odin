@@ -14,10 +14,10 @@ os_init :: proc() {
   state.os.clipboard.allocator = context.allocator
   // assert(js.add_window_event_listener(.Key_Down, nil, key_down_callback))
   // assert(js.add_window_event_listener(.Key_Up, nil, key_up_callback))
-  // assert(js.add_window_event_listener(.Mouse_Down, nil, mouse_down_callback))
-  // assert(js.add_window_event_listener(.Mouse_Up, nil, mouse_up_callback))
-  // assert(js.add_event_listener("wgpu-canvas", .Mouse_Move, nil, mouse_move_callback))
-  // assert(js.add_window_event_listener(.Wheel, nil, scroll_callback))
+  assert(js.add_window_event_listener(.Mouse_Down, nil, mouse_down_callback))
+  assert(js.add_window_event_listener(.Mouse_Up, nil, mouse_up_callback))
+  assert(js.add_event_listener("wgpu-canvas", .Mouse_Move, nil, mouse_move_callback))
+  assert(js.add_window_event_listener(.Wheel, nil, scroll_callback))
   assert(js.add_window_event_listener(.Resize, nil, size_callback))
 }
 
@@ -41,10 +41,10 @@ step :: proc(dt: f32) -> bool {
 os_fini :: proc() {
   // js.remove_window_event_listener(.Key_Down, nil, key_down_callback)
   // js.remove_window_event_listener(.Key_Up, nil, key_up_callback)
-  // js.remove_window_event_listener(.Mouse_Down, nil, mouse_down_callback)
-  // js.remove_window_event_listener(.Mouse_Up, nil, mouse_up_callback)
-  // js.remove_event_listener("wgpu-canvas", .Mouse_Move, nil, mouse_move_callback)
-  // js.remove_window_event_listener(.Wheel, nil, scroll_callback)
+  js.remove_window_event_listener(.Mouse_Down, nil, mouse_down_callback)
+  js.remove_window_event_listener(.Mouse_Up, nil, mouse_up_callback)
+  js.remove_event_listener("wgpu-canvas", .Mouse_Move, nil, mouse_move_callback)
+  js.remove_window_event_listener(.Wheel, nil, scroll_callback)
   js.remove_window_event_listener(.Resize, nil, size_callback)
 }
 
@@ -83,98 +83,41 @@ os_get_clipboard :: proc(_: rawptr) -> (string, bool) {
   return string(state.os.clipboard[:]), true
 }
 
-// @(private="file")
-// KEY_MAP := map[string]mu.Key{
-// "ShiftLeft"    = .SHIFT,
-// 	"ShiftRight"   = .SHIFT,
-// 	"ControlLeft"  = .CTRL,
-// 	"ControlRight" = .CTRL,
-// 	"MetaLeft"     = .CTRL,
-// 	"MetaRight"    = .CTRL,
-// 	"AltLeft"      = .ALT,
-// 	"AltRight"     = .ALT,
-// 	"Backspace"    = .BACKSPACE,
-// 	"Delete"       = .DELETE,
-// 	"Enter"        = .RETURN,
-// 	"ArrowLeft"    = .LEFT,
-// 	"ArrowRight"   = .RIGHT,
-// 	"Home"         = .HOME,
-// 	"End"          = .END,
-// 	"KeyA"         = .A,
-// 	"KeyX"         = .X,
-// 	"KeyC"         = .C,
-// 	"KeyV"         = .V,
-// }
+@(private = "file")
+mouse_down_callback :: proc(e: js.Event) {
+  context = state.ctx
 
-// @(private="file")
-// key_down_callback :: proc(e: js.Event) {
-// 	context = state.ctx
+  // LEFT
+  if e.data.mouse.button == 0 {
+    state.pointer_down = true
+  }
 
-// 	js.event_prevent_default()
+  js.event_prevent_default()
+}
 
-// 	if k, ok := KEY_MAP[e.data.key.code]; ok {
-// 		mu.input_key_down(&state.mu_ctx, k)
-// 	}
+@(private = "file")
+mouse_up_callback :: proc(e: js.Event) {
+  context = state.ctx
 
-// 	if .CTRL in state.mu_ctx.key_down_bits {
-// 		return
-// 	}
+  // LEFT
+  if e.data.mouse.button == 0 {
+    state.pointer_down = false
+  }
 
-// 	ch, size := utf8.decode_rune(e.data.key.key)
-// 	if len(e.data.key.key) == size && unicode.is_print(ch) {
-// 		mu.input_text(&state.mu_ctx, e.data.key.key)
-// 	}
-// }
+  js.event_prevent_default()
+}
 
-// @(private="file")
-// key_up_callback :: proc(e: js.Event) {
-// 	context = state.ctx
+@(private = "file")
+mouse_move_callback :: proc(e: js.Event) {
+  context = state.ctx
+  state.cursor_pos = {f32(e.data.mouse.offset.x), f32(e.data.mouse.offset.y)} * os_get_dpi()
+}
 
-// 	if k, ok := KEY_MAP[e.data.key.code]; ok {
-// 		mu.input_key_up(&state.mu_ctx, k)
-// 	}
-
-// 	js.event_prevent_default()
-// }
-
-// @(private="file")
-// mouse_down_callback :: proc(e: js.Event) {
-// 	context = state.ctx
-
-// 	switch e.data.mouse.button {
-// 	case 0: mu.input_mouse_down(&state.mu_ctx, state.cursor.x, state.cursor.y, .LEFT)
-// 	case 1: mu.input_mouse_down(&state.mu_ctx, state.cursor.x, state.cursor.y, .MIDDLE)
-// 	case 2: mu.input_mouse_down(&state.mu_ctx, state.cursor.x, state.cursor.y, .RIGHT)
-// 	}
-
-// 	js.event_prevent_default()
-// }
-
-// @(private="file")
-// mouse_up_callback :: proc(e: js.Event) {
-// 	context = state.ctx
-
-// 	switch e.data.mouse.button {
-// 	case 0: mu.input_mouse_up(&state.mu_ctx, state.cursor.x, state.cursor.y, .LEFT)
-// 	case 1: mu.input_mouse_up(&state.mu_ctx, state.cursor.x, state.cursor.y, .MIDDLE)
-// 	case 2: mu.input_mouse_up(&state.mu_ctx, state.cursor.x, state.cursor.y, .RIGHT)
-// 	}
-
-// 	js.event_prevent_default()
-// }
-
-// @(private="file")
-// mouse_move_callback :: proc(e: js.Event) {
-// 	context = state.ctx
-// 	state.cursor = {i32(e.data.mouse.offset.x), i32(e.data.mouse.offset.y)}
-// 	mu.input_mouse_move(&state.mu_ctx, state.cursor.x, state.cursor.y)
-// }
-
-// @(private="file")
-// scroll_callback :: proc(e: js.Event) {
-// 	context = state.ctx
-// 	mu.input_scroll(&state.mu_ctx, i32(e.data.wheel.delta.x), i32(e.data.wheel.delta.y))
-// }
+@(private = "file")
+scroll_callback :: proc(e: js.Event) {
+  context = state.ctx
+  state.scroll_delta = {f32(e.data.wheel.delta.x), f32(e.data.wheel.delta.y)}
+}
 
 @(private = "file")
 size_callback :: proc(e: js.Event) {
