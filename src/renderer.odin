@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:image/png"
 import "vendor:wgpu"
 
-import clay "../../../external/clay/bindings/odin/clay-odin"
+import clay "../clay-odin"
 
 COLOR_WHITE :: clay.Color{255, 255, 255, 255}
 

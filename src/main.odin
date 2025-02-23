@@ -6,7 +6,7 @@ import "core:log"
 @(require) import "core:fmt"
 @(require) import "core:mem"
 
-import clay "../../../external/clay/bindings/odin/clay-odin"
+import clay "../clay-odin"
 
 LOG_LEVEL :: log.Level.Debug when ODIN_DEBUG else log.Level.Info
 

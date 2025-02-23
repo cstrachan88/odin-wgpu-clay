@@ -1,7 +1,7 @@
 #+feature dynamic-literals
 package wgpu_app
 
-import clay "../../../external/clay/bindings/odin/clay-odin"
+import clay "../clay-odin"
 
 Font :: struct {
   using info:   struct {
