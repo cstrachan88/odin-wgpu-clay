@@ -6,8 +6,7 @@ import "core:log"
 @(require) import "core:fmt"
 @(require) import "core:mem"
 
-// import clay "shared:clay/bindings/odin/clay-odin"
-import clay "../../clay/bindings/odin/clay-odin"
+import clay "../../../external/clay/bindings/odin/clay-odin"
 
 LOG_LEVEL :: log.Level.Debug when ODIN_DEBUG else log.Level.Info
 
@@ -20,6 +19,7 @@ state := struct {
   pointer_down: bool,
   scroll_delta: [2]f32,
   show_debug:   bool,
+  clay_memory:  []u8,
 } {
   bg = {90, 95, 100, 255},
 }
@@ -49,25 +49,22 @@ main :: proc() {
   context.logger = log.create_console_logger(LOG_LEVEL)
   state.ctx = context
 
-  min_memory_size: u32 = clay.MinMemorySize()
-  memory := make([]u8, min_memory_size)
-  defer delete(memory)
-
-  arena: clay.Arena = clay.CreateArenaWithCapacityAndMemory(min_memory_size, raw_data(memory))
-  clay.SetMeasureTextFunction(measure_text)
-
   os_init()
+  width, height := os_get_render_bounds()
 
+  min_memory_size: u32 = clay.MinMemorySize()
+  state.clay_memory = make([]u8, min_memory_size)
+  arena := clay.CreateArenaWithCapacityAndMemory(min_memory_size, raw_data(state.clay_memory))
+  clay.Initialize(arena, {f32(width), f32(height)}, {handler = ui_error_handler})
+  clay.SetMeasureTextFunction(measure_text, nil)
   clay.SetCullingEnabled(true)
   // clay.SetDebugModeEnabled(true)
-
-  width, height := os_get_render_bounds()
-  clay.Initialize(arena, {f32(width), f32(height)}, {handler = ui_error_handler})
 
   r_init_and_run()
 }
 
 finalize :: proc() {
+  delete(state.clay_memory)
   log.destroy_console_logger(state.ctx.logger)
 }
 

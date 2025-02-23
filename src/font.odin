@@ -1,7 +1,7 @@
+#+feature dynamic-literals
 package wgpu_app
 
-// import clay "shared:clay/bindings/odin/clay-odin"
-import clay "../../clay/bindings/odin/clay-odin"
+import clay "../../../external/clay/bindings/odin/clay-odin"
 
 Font :: struct {
   using info:   struct {
@@ -150,7 +150,11 @@ APP_FONTS := [?]App_Font {
   },
 }
 
-measure_text :: proc "c" (text: ^clay.String, config: ^clay.TextElementConfig) -> clay.Dimensions {
+measure_text :: proc "c" (
+  text: clay.StringSlice,
+  config: ^clay.TextElementConfig,
+  userData: rawptr = nil,
+) -> clay.Dimensions {
   context = state.ctx
 
   // TODO: incorporate config

@@ -4,8 +4,7 @@ import "core:fmt"
 import "core:image/png"
 import "vendor:wgpu"
 
-// import clay "shared:clay/bindings/odin/clay-odin"
-import clay "../../clay/bindings/odin/clay-odin"
+import clay "../../../external/clay/bindings/odin/clay-odin"
 
 COLOR_WHITE :: clay.Color{255, 255, 255, 255}
 
@@ -402,41 +401,48 @@ r_render :: proc() {
   wgpu.TextureRelease(curr_texture.texture)
 }
 
+@(private = "file")
+layout_expand := clay.Sizing {
+  width  = clay.SizingGrow({}),
+  height = clay.SizingGrow({}),
+}
+
+@(private = "file")
+content_background_color := clay.Color{90, 90, 90, 255}
+
+@(private = "file")
+content_corner_radius := clay.CornerRadius{8, 8, 8, 8}
+
 clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
-  layout_expand := clay.Sizing {
-    width  = clay.SizingGrow({}),
-    height = clay.SizingGrow({}),
-  }
-
-  content_background_config := clay.RectangleElementConfig {
-    color        = {90, 90, 90, 255},
-    cornerRadius = {8, 8, 8, 8},
-  }
-
   clay.BeginLayout()
 
-  if clay.UI(
-    clay.ID("OuterContainer"),
-    clay.Rectangle({color = {43, 41, 51, 255}}),
-    clay.Layout({layoutDirection = .TOP_TO_BOTTOM, sizing = layout_expand, padding = {16, 16}, childGap = 16}),
+  if clay.UI()(
+  clay.ElementDeclaration {
+    id = clay.ID("OuterContainer"),
+    backgroundColor = {43, 41, 51, 255},
+    layout = {layoutDirection = .TopToBottom, sizing = layout_expand, padding = {16, 16, 16, 16}, childGap = 16},
+  },
   ) {
-    if clay.UI(
-      clay.ID("HeaderBar"),
-      clay.Rectangle(content_background_config),
-      clay.Layout(
-        {
-          sizing = {clay.SizingGrow({}), clay.SizingFixed(60)},
-          padding = {x = 16},
-          childGap = 16,
-          childAlignment = {y = .CENTER},
-        },
-      ),
+    if clay.UI()(
+    clay.ElementDeclaration {
+      id = clay.ID("HeaderBar"),
+      backgroundColor = content_background_color,
+      cornerRadius = content_corner_radius,
+      layout = {
+        sizing = {clay.SizingGrow({}), clay.SizingFixed(60)},
+        padding = {left = 16, right = 16},
+        childGap = 16,
+        childAlignment = {y = .Center},
+      },
+    },
     ) {
-
-      if clay.UI(
-        clay.ID("FileButton"),
-        clay.Layout({padding = {16, 8}}),
-        clay.Rectangle({color = {140, 140, 140, 255}, cornerRadius = {5, 5, 5, 5}}),
+      if clay.UI()(
+      clay.ElementDeclaration {
+        id = clay.ID("FileButton"),
+        backgroundColor = clay.Color{140, 140, 140, 255},
+        cornerRadius = clay.CornerRadius{5, 5, 5, 5},
+        layout = clay.LayoutConfig{padding = clay.Padding{16, 16, 8, 8}},
+      },
       ) {
         clay.Text("File", clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
 
@@ -444,12 +450,16 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
           clay.PointerOver(clay.GetElementId(clay.MakeString("FileButton"))) ||
           clay.PointerOver(clay.GetElementId(clay.MakeString("FileMenu")))
 
+        // FIXME: layout incorrect on glfw - ok in browser
         if file_menu_visible {
-          if clay.UI(
-            clay.ID("FileMenu"),
-            clay.Floating({attachment = {parent = .LEFT_BOTTOM}}),
-            clay.Rectangle({color = {40, 40, 40, 255}, cornerRadius = {8, 8, 8, 8}}),
-            clay.Layout({layoutDirection = .TOP_TO_BOTTOM, sizing = {width = clay.SizingFixed(200)}}),
+          if clay.UI()(
+          clay.ElementDeclaration {
+            id = clay.ID("FileMenu"),
+            floating = {attachment = {parent = .LeftBottom}},
+            backgroundColor = {40, 40, 40, 255},
+            cornerRadius = {8, 8, 8, 8},
+            layout = {layoutDirection = .TopToBottom, sizing = {width = clay.SizingFixed(200)}},
+          },
           ) {
             render_dropdown_item("New")
             render_dropdown_item("Open")
@@ -459,38 +469,56 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
       }
 
       render_header_button("Edit")
-      if clay.UI(clay.Layout({sizing = {width = clay.SizingGrow({})}})) {}
+      if clay.UI()({layout = {sizing = {width = clay.SizingGrow({})}}}) {}
       render_header_button("Upload")
       render_header_button("Media")
       render_header_button("Support")
     }
-    if clay.UI(clay.ID("LowerContent"), clay.Layout({sizing = layout_expand, childGap = 16})) {
-      if clay.UI(
-        clay.ID("Sidebar"),
-        clay.Rectangle(content_background_config),
-        clay.Layout(
-          {
-            layoutDirection = .TOP_TO_BOTTOM,
-            padding = {16, 16},
-            childGap = 8,
-            sizing = {clay.SizingFixed(250), clay.SizingGrow({})},
-          },
-        ),
+
+    if clay.UI()(
+    clay.ElementDeclaration {
+      id = clay.ID("LowerContent"),
+      layout = clay.LayoutConfig{sizing = layout_expand, childGap = 16},
+    },
+    ) {
+      if clay.UI()(
+      clay.ElementDeclaration {
+        id = clay.ID("Sidebar"),
+        backgroundColor = content_background_color,
+        cornerRadius = content_corner_radius,
+        layout = clay.LayoutConfig {
+          layoutDirection = .TopToBottom,
+          padding = clay.Padding{16, 16, 16, 16},
+          childGap = 8,
+          sizing = clay.Sizing{clay.SizingFixed(250), clay.SizingGrow({})},
+        },
+      },
       ) {
         for d, i in documents {
           if u32(i) == selected_document_idx {
-            if clay.UI(
-              clay.Layout({padding = {16, 16}, sizing = clay.Sizing{width = clay.SizingGrow({})}}),
-              clay.Rectangle({color = {120, 120, 120, 255}, cornerRadius = {8, 8, 8, 8}}),
+            if clay.UI()(
+            clay.ElementDeclaration {
+              backgroundColor = clay.Color{120, 120, 120, 255},
+              cornerRadius = clay.CornerRadius{8, 8, 8, 8},
+              layout = clay.LayoutConfig {
+                padding = clay.Padding{16, 16, 16, 16},
+                sizing = clay.Sizing{width = clay.SizingGrow({})},
+              },
+            },
             ) {
               clay.Text(d.title, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
             }
           }
            else {
-            if clay.UI(
-              clay.Layout({padding = {16, 16}, sizing = clay.Sizing{width = clay.SizingGrow({})}}),
-              // BUG: Hovered is triggering when the parent container is hovered
-              clay.Rectangle({color = clay.Hovered() ? {120, 120, 120, 120} : {}, cornerRadius = {8, 8, 8, 8}}),
+            if clay.UI()(
+            clay.ElementDeclaration {
+              // TODO: BUG: Hovered is triggering when the parent container is hovered
+              // clay.Rectangle({color = clay.Hovered() ? {120, 120, 120, 120} : {}, cornerRadius = {8, 8, 8, 8}}),
+              // NOTE: Seems very slow to render hover
+              backgroundColor = clay.Hovered() ? clay.Color{120, 120, 120, 120} : {},
+              cornerRadius = clay.CornerRadius{8, 8, 8, 8},
+              layout = clay.LayoutConfig{padding = {16, 16, 16, 16}, sizing = clay.Sizing{width = clay.SizingGrow({})}},
+            },
             ) {
               // NOTE: OnHover must be handled inside element - doesn't return a TypedConfig
               clay.OnHover(handle_hover, nil)
@@ -499,11 +527,20 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
           }
         }
       }
-      if clay.UI(
-        clay.ID("MainContent"),
-        clay.Rectangle(content_background_config),
-        clay.Scroll({vertical = true}),
-        clay.Layout({layoutDirection = .TOP_TO_BOTTOM, childGap = 16, padding = {16, 16}, sizing = layout_expand}),
+
+      if clay.UI()(
+      clay.ElementDeclaration {
+        id = clay.ID("MainContent"),
+        backgroundColor = content_background_color,
+        cornerRadius = content_corner_radius,
+        scroll = {vertical = true},
+        layout = clay.LayoutConfig {
+          layoutDirection = .TopToBottom,
+          childGap = 16,
+          padding = clay.Padding{16, 16, 16, 16},
+          sizing = layout_expand,
+        },
+      },
       ) {
         selected_document := documents[selected_document_idx]
         clay.Text(
@@ -524,22 +561,25 @@ clay_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 handle_hover :: proc "c" (elementId: clay.ElementId, pointerInfo: clay.PointerData, userData: rawptr) {
   context = state.ctx
   // NOTE: Using offset here since it is sequential from 0 and matched the document index
-  if pointerInfo.state == .PRESSED_THIS_FRAME {
+  if pointerInfo.state == .PressedThisFrame {
     selected_document_idx = elementId.offset
   }
 }
 
 render_header_button :: proc(text: string) {
-  if clay.UI(
-    clay.Layout({padding = {16, 8}}),
-    clay.Rectangle({color = {140, 140, 140, 255}, cornerRadius = {5, 5, 5, 5}}),
+  if clay.UI()(
+  clay.ElementDeclaration {
+    layout = clay.LayoutConfig{padding = clay.Padding{16, 16, 8, 8}},
+    backgroundColor = clay.Color{140, 140, 140, 255},
+    cornerRadius = clay.CornerRadius{5, 5, 5, 5},
+  },
   ) {
     clay.Text(text, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
   }
 }
 
 render_dropdown_item :: proc(text: string) {
-  if clay.UI(clay.Layout({padding = {16, 8}})) {
+  if clay.UI()(clay.ElementDeclaration{layout = clay.LayoutConfig{padding = clay.Padding{16, 16, 8, 8}}}) {
     clay.Text(text, clay.TextConfig({fontId = DEFAULT_FONT_ID, fontSize = 16, textColor = COLOR_WHITE}))
   }
 }
@@ -562,21 +602,20 @@ clay_render :: proc(
 
     switch render_command.commandType {
       case clay.RenderCommandType.None:
+      // NOTE: Do nothing?
 
       case clay.RenderCommandType.Text:
         // TODO: use storage buffer?
-
         // TODO: incorporate config
-        config := render_command.config.textElementConfig
 
         pos := [2]f32{bounding_box.x, bounding_box.y}
 
-        app_font := APP_FONTS[config.fontId]
+        app_font := APP_FONTS[render_command.renderData.text.fontId]
 
-        for j in 0 ..< render_command.text.length {
-          if render_command.text.chars[j] == 0 do break
+        for j in 0 ..< render_command.renderData.text.stringContents.length {
+          if render_command.renderData.text.stringContents.chars[j] == 0 do break
 
-          character, ok := app_font.font.characters[render_command.text.chars[j]]
+          character, ok := app_font.font.characters[render_command.renderData.text.stringContents.chars[j]]
           if !ok do character = app_font.error_char
 
           size := [2]f32{f32(character.width), f32(character.height)}
@@ -587,9 +626,9 @@ clay_render :: proc(
             &rects,
             Ui_Rect {
               pos = pos,
-              color = config.textColor / 255.0,
+              color = render_command.renderData.text.textColor / 255.0,
               size = size,
-              font_selection = u32(config.fontId + 1),
+              font_selection = u32(render_command.renderData.text.fontId + 1),
               font_offset = offset / scale,
             },
           )
@@ -597,10 +636,8 @@ clay_render :: proc(
           pos += {size.x, 0}
         }
 
-      case clay.RenderCommandType.Image: // TODO
-
       case clay.RenderCommandType.ScissorStart:
-        // NOTE: Can their be nested scissors???
+        // NOTE: Can there be nested scissors???
         append(
           &scissors,
           Scissor {
@@ -612,29 +649,27 @@ clay_render :: proc(
       case clay.RenderCommandType.ScissorEnd: scissors[len(scissors) - 1].end = u32(len(rects))
 
       case clay.RenderCommandType.Rectangle:
-        config := render_command.config.rectangleElementConfig
-        // fmt.println(render_command)
-        // fmt.printfln("%p", render_command.config.rectangleElementConfig)
-        // fmt.println(render_command.config.rectangleElementConfig) // BUG: "Uncaught RuntimeError: memory access out of bounds" in js_wasm32 build
-
         append(
           &rects,
           Ui_Rect {
             pos = {bounding_box.x, bounding_box.y},
             size = {bounding_box.width, bounding_box.height},
-            color = config.color / 255.0,
+            color = render_command.renderData.rectangle.backgroundColor / 255.0,
             corner_radius = {
-              config.cornerRadius.topLeft,
-              config.cornerRadius.topRight,
-              config.cornerRadius.bottomLeft,
-              config.cornerRadius.bottomRight,
+              render_command.renderData.rectangle.cornerRadius.topLeft,
+              render_command.renderData.rectangle.cornerRadius.topRight,
+              render_command.renderData.rectangle.cornerRadius.bottomLeft,
+              render_command.renderData.rectangle.cornerRadius.bottomRight,
             },
           },
         )
 
-      case clay.RenderCommandType.Border: // TODO
-
+      case clay.RenderCommandType.Image:
+      // TODO
+      case clay.RenderCommandType.Border:
+      // TODO
       case clay.RenderCommandType.Custom:
+      // TODO
     }
   }
 
